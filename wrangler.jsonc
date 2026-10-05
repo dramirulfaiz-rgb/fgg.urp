@@ -10,7 +10,7 @@
     {
       "binding": "DB",
       "database_name": "fgg-urp-db",
-      "database_id": "00000000-0000-4000-8000-000000000000",
+      "database_id": "5990ed09-5af6-4fbd-853f-dfd43db34e17",
       "migrations_dir": "drizzle"
     }
   ],
