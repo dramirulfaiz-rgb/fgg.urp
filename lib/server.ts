@@ -1,0 +1,9 @@
+import { env } from 'cloudflare:workers';
+export function database(){if(!env.DB)throw new Error('Proposal storage is temporarily unavailable. Please try again.');return env.DB;}
+export async function hash(s:string){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))).map(x=>x.toString(16).padStart(2,'0')).join('');}
+export function random(){return crypto.randomUUID().replaceAll('-','');}
+export async function session(req:Request){const t=req.headers.get('cookie')?.match(/(?:^|;\s*)fgg_session=([a-f0-9]+)/)?.[1];if(!t)return null;return await database().prepare('SELECT role,proposal_id FROM sessions WHERE token_hash=? AND expires>?').bind(await hash(t),Date.now()).first<{role:string,proposal_id:number}>();}
+export async function newSession(role:string,id:number|null){const token=random();await database().prepare('INSERT INTO sessions (token_hash,role,proposal_id,expires) VALUES (?,?,?,?)').bind(await hash(token),role,id,Date.now()+86400000).run();return `fgg_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400; Secure`;}
+export async function rate(req:Request,kind:string,max:number){const ip=req.headers.get('cf-connecting-ip')||'local';const id=await hash(ip+kind+Math.floor(Date.now()/900000));const row=await database().prepare('INSERT INTO limits (id,hits) VALUES (?,1) ON CONFLICT(id) DO UPDATE SET hits=hits+1 RETURNING hits').bind(id).first<{hits:number}>();if((row?.hits||0)>max)throw new Error('Too many attempts. Please try again in 15 minutes.');}
+export function safe(row:any){return {...row,status:row.status==='Proposal accepted'?'Proposal received':row.status,key_hash:undefined,data:JSON.parse(row.data),snapshot:row.snapshot?JSON.parse(row.snapshot):null};}
+export function adminPassword(){return (env as unknown as {ADMIN_PASSWORD?:string}).ADMIN_PASSWORD;}
